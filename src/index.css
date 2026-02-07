@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+#root {
+  width: 100vw;
+  height: 100vh;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+.animate-shake {
+  animation: shake 0.4s;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-30px);
+  }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(-6deg); }
+  50% { transform: translateY(-15px) rotate(-6deg); }
+}
+
+@keyframes float-reverse {
+  0%, 100% { transform: translateY(0) rotate(6deg); }
+  50% { transform: translateY(-15px) rotate(6deg); }
+}
+
+/* Apply these to the left and right containers in the JSX above */
+.md\:block:first-child { animation: float 4s ease-in-out infinite; }
+.md\:block:last-child { animation: float-reverse 4s ease-in-out infinite; }
+
+/* The actual image inside the frame */
+.birthday-side-img {
+  width: 100%;
+  height: 250px; /* Keep a fixed box size */
+  
+  /* CHANGE THIS: 'contain' ensures the whole photo is visible */
+  object-fit: contain; 
+  
+  /* Optional: add a light background to the image area 
+     so if the photo is thin, the gap isn't just empty white */
+  background-color: #f8f8f8; 
+  border: 1px solid #ddd;
+}
+
+/* The frame itself */
+.polaroid-frame {
+  background: white;
+  padding: 12px; /* Uniform padding on top/sides */
+  padding-bottom: 50px; /* Extra space at bottom for the "Polaroid" look */
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
+}
