@@ -3,8 +3,8 @@ import React, { useState, useEffect } from 'react';
 // ============================================
 // DATE CONFIG
 // ============================================
-const date = 2;
-const month = 8;
+const date = 21;
+const month = 9;
 const oneDay = 24 * 60 * 60 * 1000;
 
 // ============================================
