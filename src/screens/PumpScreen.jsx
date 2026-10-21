@@ -11,7 +11,7 @@ const DOOR = { x: 40, y: 54, w: 38, h: 30 };          // relative to the car
 const INLET = (carX) => ({ x: carX + DOOR.x + 16, y: CAR_Y + DOOR.y + 13 });
 
 // ---- filling game: stop the oscillating meter inside the green zone ----
-const BASE = { width: 0.03, speed: 0.9 };   // first attempt: zone width / sweeps per second (as fraction of the bar)
+const BASE = { width: 0.012, speed: 0.9 };   // first attempt: zone width / sweeps per second (as fraction of the bar)
 const EASE = { width: 0.03, speed: 0.12 };  // every retry: wider zone, slower meter
 const LIMIT = { width: 0.24, speed: 0.4 };
 const newZone = (fails) => ({
