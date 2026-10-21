@@ -369,7 +369,7 @@ export default function PumpScreen({ onDone }) {
         <div className="absolute top-16 left-1/2 -translate-x-1/2 w-[min(92vw,640px)] bg-slate-900/90 rounded-2xl p-4 text-white shadow-xl z-40">
           <div className="flex justify-between text-sm font-bold mb-2">
             <span>⛽ FILL METER</span>
-            <span className="text-emerald-300">{fails > 0 ? '🍀 Easier this time: wider zone, slower meter' : 'Stop it in the green zone!'}</span>
+            <span className="text-emerald-300">Stop it in the green zone!</span>
           </div>
           <div className="relative h-12 rounded-full bg-slate-700 overflow-hidden border-2 border-slate-400">
             <div className="absolute inset-y-0 bg-emerald-400/60 border-x-4 border-emerald-300" style={{ left: `${(zone.c - zone.width / 2) * 100}%`, width: `${zone.width * 100}%` }} />
