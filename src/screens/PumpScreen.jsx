@@ -77,6 +77,7 @@ export default function PumpScreen({ onDone }) {
   const [marker, setMarker] = useState(0);
   const [gifOk, setGifOk] = useState(true);
   const [boomKey, setBoomKey] = useState(0);
+  const explosionSfx = useRef(null);
   const [size, setSize] = useState({ w: window.innerWidth, h: window.innerHeight });
 
   const stepRef = useRef('park');
@@ -96,6 +97,21 @@ export default function PumpScreen({ onDone }) {
     window.addEventListener('resize', r);
     return () => window.removeEventListener('resize', r);
   }, []);
+
+  // explosion sound effect, preloaded so it fires the instant the station blows up
+  useEffect(() => {
+    const a = new Audio('/audio/explosion.mp3');
+    a.preload = 'auto';
+    explosionSfx.current = a;
+  }, []);
+
+  function playExplosion() {
+    const a = explosionSfx.current;
+    if (!a) return boom();
+    a.currentTime = 0;
+    a.volume = 1;
+    a.play().catch(boom); // fall back to the synthesized boom if the file can't play
+  }
 
   // ---- parking: arrow keys move the car along the lane ----
   useEffect(() => {
@@ -150,7 +166,7 @@ export default function PumpScreen({ onDone }) {
       beep(160, 0.4, 'sawtooth');
       setTimeout(() => {
         go('drip');
-        setTimeout(() => { setBoomKey(Date.now()); boom(); go('boom'); }, 1600);
+        setTimeout(() => { setBoomKey(Date.now()); playExplosion(); go('boom'); }, 1600);
         setTimeout(() => go('laugh'), 5200);
       }, 900);
     }
