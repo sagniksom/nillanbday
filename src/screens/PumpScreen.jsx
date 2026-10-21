@@ -1,21 +1,24 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Confetti, playSound, beep } from '../confetti';
+import { Confetti, beep, boom } from '../confetti';
 
 // ---- stage geometry (design space is 1280x720, scaled to fit the window) ----
 const W = 1280, H = 720;
-const SPOT_X = 540, CAR_Y = 410, PARK_TOL = 50, CAR_START = 20;
+const SPOT_X = 540, CAR_Y = 384, PARK_TOL = 50, CAR_START = 20;
 const READER = { x: 395, y: 432 };
 const HOSE_PORT = { x: 492, y: 470 };
 const NOZZLE_HOME = { x: 500, y: 385 };
-const DOOR = { x: 66, y: 54, w: 46, h: 36 };          // relative to the car
+const DOOR = { x: 40, y: 54, w: 38, h: 30 };          // relative to the car
 const INLET = (carX) => ({ x: carX + DOOR.x + 16, y: CAR_Y + DOOR.y + 13 });
 
-// ---- filling game ----
-const ZONE_MIN = 98;   // releasing between ZONE_MIN and 100 is a clean fill
-const RATE = 14;       // average % per second while holding
-const SURGE_MIN = 0.6, SURGE_MAX = 1.7; // the pump's flow randomly surges and stalls
-const HIDE_NUMBER_AT = 85; // pump readout goes blank near the top
-const randStart = () => 8 + Math.random() * 22;
+// ---- filling game: stop the oscillating meter inside the green zone ----
+const BASE = { width: 0.09, speed: 0.9 };   // first attempt: zone width / sweeps per second (as fraction of the bar)
+const EASE = { width: 0.03, speed: 0.12 };  // every retry: wider zone, slower meter
+const LIMIT = { width: 0.24, speed: 0.4 };
+const newZone = (fails) => ({
+  c: 0.2 + Math.random() * 0.65,
+  width: Math.min(LIMIT.width, BASE.width + EASE.width * fails),
+  speed: Math.max(LIMIT.speed, BASE.speed - EASE.speed * fails),
+});
 
 const STEPS = [
   ['park', '🚗', 'Park'], ['card', '💳', 'Pay'], ['fuel', '⛽', 'Fuel'],
@@ -33,36 +36,11 @@ const GRADES = [
 
 function Car({ x, capStage, onDoor, onCap, step }) {
   return (
-    <div className="absolute" style={{ left: x, top: CAR_Y, width: 400, height: 150 }}>
-      <svg width="400" height="150" viewBox="0 0 400 150">
-        <ellipse cx="200" cy="142" rx="190" ry="8" fill="#000" opacity=".25" />
-        {/* roof rails */}
-        <rect x="64" y="9" width="212" height="5" rx="2" fill="#1f2937" />
-        <rect x="80" y="12" width="6" height="6" fill="#1f2937" /><rect x="250" y="12" width="6" height="6" fill="#1f2937" />
-        {/* body */}
-        <path d="M10 110 L10 54 Q10 34 26 30 L62 26 L70 17 L270 15 Q292 15 304 32 L336 58 L372 64 Q392 70 392 90 L392 110 Z" fill="#9ca3af" stroke="#4b5563" strokeWidth="3" />
-        {/* windows */}
-        <path d="M22 38 L62 32 L62 52 L16 52 Z" fill="#cfe8ff" />
-        <path d="M70 26 L130 25 L130 52 L70 52 Z" fill="#cfe8ff" />
-        <path d="M138 25 L200 25 L200 52 L138 52 Z" fill="#cfe8ff" />
-        <path d="M208 25 L262 25 L298 52 L208 52 Z" fill="#cfe8ff" />
-        {/* door lines + handles */}
-        <path d="M134 25 L134 98 M204 25 L204 98" stroke="#6b7280" strokeWidth="2" />
-        <rect x="112" y="60" width="16" height="4" rx="2" fill="#374151" /><rect x="178" y="60" width="16" height="4" rx="2" fill="#374151" />
-        {/* black lower cladding + wheel arches (Subaru Outback style) */}
-        <path d="M10 96 L392 96 L392 110 L10 110 Z" fill="#374151" />
-        <circle cx="90" cy="108" r="37" fill="#1f2937" /><circle cx="310" cy="108" r="37" fill="#1f2937" />
-        {/* lights + hexagonal grille */}
-        <rect x="8" y="62" width="9" height="22" rx="3" fill="#dc2626" />
-        <path d="M376 68 L392 72 L392 84 L372 80 Z" fill="#fde68a" />
-        <path d="M385 88 L392 88 L392 98 L385 98 L380 93 Z" fill="#111827" />
-        {[90, 310].map((cx) => (
-          <g key={cx}><circle cx={cx} cy="108" r="28" fill="#111827" /><circle cx={cx} cy="108" r="15" fill="#d1d5db" /><circle cx={cx} cy="108" r="4" fill="#6b7280" /></g>
-        ))}
-      </svg>
+    <div className="absolute" style={{ left: x, top: CAR_Y, width: 400, height: 171 }}>
+      <img src="/sprites/forester.png" width="400" height="171" alt="" draggable={false} className="pointer-events-none select-none" />
       {/* fuel door */}
       <div className="absolute" style={{ left: DOOR.x, top: DOOR.y, width: DOOR.w, height: DOOR.h }}>
-        <div className="absolute inset-0 rounded bg-neutral-900 border border-gray-700 flex items-center justify-center">
+        <div className={`absolute inset-0 rounded flex items-center justify-center ${capStage >= 1 ? 'bg-neutral-900 border border-gray-700' : ''}`}>
           {capStage === 1 && (
             <button onClick={onCap} className="w-7 h-7 rounded-full bg-gray-300 border-2 border-gray-500 hint" title="gas cap">
               <span className="block w-full h-[2px] bg-gray-500 mt-[11px]" />
@@ -73,7 +51,7 @@ function Car({ x, capStage, onDoor, onCap, step }) {
         <button
           onClick={onDoor}
           disabled={capStage !== 0}
-          className={`absolute inset-0 rounded bg-gray-400 border border-gray-700 ${capStage === 0 && step === 'cap' ? 'hint cursor-pointer' : ''}`}
+          className={`absolute inset-0 rounded ${capStage >= 1 ? 'bg-gray-400 border border-gray-700' : 'bg-transparent'} ${capStage === 0 && step === 'cap' ? 'hint cursor-pointer' : ''}`}
           style={{ transformOrigin: 'left center', transition: 'transform .5s', transform: capStage >= 1 ? 'perspective(120px) rotateY(-110deg)' : 'none' }}
           title="fuel door"
         />
@@ -93,18 +71,18 @@ export default function PumpScreen({ onDone }) {
   const [wrong, setWrong] = useState(false);
   const [drag, setDrag] = useState(null);     // { id, x, y }
   const [nozzleOn, setNozzleOn] = useState(false);
-  const [level, setLevel] = useState(randStart);
-  const [holding, setHolding] = useState(false);
+  const [zone, setZone] = useState(() => newZone(0));
+  const [fails, setFails] = useState(0);
+  const [fillPhase, setFillPhase] = useState('ready'); // ready | running | stopped
+  const [marker, setMarker] = useState(0);
   const [gifOk, setGifOk] = useState(true);
   const [boomKey, setBoomKey] = useState(0);
   const [size, setSize] = useState({ w: window.innerWidth, h: window.innerHeight });
 
   const stepRef = useRef('park');
-  const levelRef = useRef(level);
-  const holdRef = useRef(false);
+  const fillRef = useRef({ phase: 'ready', t0: 0, m: 0, zone, hit: false });
   const carRef = useRef({ x: CAR_START, v: 0, still: 0 });
   const keys = useRef({});
-  const flow = useRef({ m: 1, until: 0 });
   const dragRef = useRef(null);
   const go = useCallback((s) => { stepRef.current = s; setStep(s); }, []);
 
@@ -121,8 +99,8 @@ export default function PumpScreen({ onDone }) {
 
   // ---- parking: arrow keys move the car along the lane ----
   useEffect(() => {
-    const kd = (e) => { if (e.key.startsWith('Arrow')) { e.preventDefault(); keys.current[e.key] = true; } if (e.code === 'Space') { e.preventDefault(); if (stepRef.current === 'fill') pumpHold(true); } };
-    const ku = (e) => { if (e.key.startsWith('Arrow')) keys.current[e.key] = false; if (e.code === 'Space') pumpHold(false); };
+    const kd = (e) => { if (e.key.startsWith('Arrow')) { e.preventDefault(); keys.current[e.key] = true; } if (e.code === 'Space') { e.preventDefault(); if (!e.repeat && stepRef.current === 'fill') triggerFill(); } };
+    const ku = (e) => { if (e.key.startsWith('Arrow')) keys.current[e.key] = false; };
     window.addEventListener('keydown', kd); window.addEventListener('keyup', ku);
     let raf, last = performance.now();
     const tick = (now) => {
@@ -140,18 +118,11 @@ export default function PumpScreen({ onDone }) {
         c.still = inSpot ? c.still + dt : 0;
         if (c.still > 0.7) { c.x = Math.round(c.x); c.v = 0; beep(660, 0.1); beep(990, 0.18); go('card'); }
       }
-      if (stepRef.current === 'fill' && holdRef.current) {
-        if (now > flow.current.until) {
-          flow.current = { m: SURGE_MIN + Math.random() * (SURGE_MAX - SURGE_MIN), until: now + 350 + Math.random() * 600 };
-        }
-        levelRef.current += RATE * flow.current.m * dt;
-        setLevel(levelRef.current);
-        if (levelRef.current > 100) {
-          holdRef.current = false; setHolding(false);
-          go('drip');
-          setTimeout(() => { setBoomKey(Date.now()); playSound('/audio/explosion.mp3', 0.9); go('boom'); }, 1600);
-          setTimeout(() => go('laugh'), 5200);
-        }
+      const f = fillRef.current;
+      if (stepRef.current === 'fill' && f.phase === 'running') {
+        const p = (((now - f.t0) / 1000) * f.zone.speed) % 2;
+        f.m = p < 1 ? p : 2 - p;
+        setMarker(f.m);
       }
       raf = requestAnimationFrame(tick);
     };
@@ -160,14 +131,34 @@ export default function PumpScreen({ onDone }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function pumpHold(v) {
-    if (stepRef.current !== 'fill') return;
-    const was = holdRef.current;
-    holdRef.current = v; setHolding(v);
-    if (was && !v && levelRef.current >= ZONE_MIN && levelRef.current <= 100) {
-      playSound('/audio/birthday.mp3', 0.5);
-      go('success');
+  function startFill() {
+    const f = fillRef.current;
+    if (stepRef.current !== 'fill' || f.phase !== 'ready') return;
+    f.phase = 'running'; f.t0 = performance.now(); setFillPhase('running');
+    beep(520, 0.08);
+  }
+
+  function stopFill() {
+    const f = fillRef.current;
+    if (stepRef.current !== 'fill' || f.phase !== 'running') return;
+    f.phase = 'stopped'; setFillPhase('stopped');
+    f.hit = Math.abs(f.m - f.zone.c) <= f.zone.width / 2;
+    if (f.hit) {
+      beep(880, 0.12); setTimeout(() => beep(1320, 0.2), 130);
+      setTimeout(() => go('success'), 900);
+    } else {
+      beep(160, 0.4, 'sawtooth');
+      setTimeout(() => {
+        go('drip');
+        setTimeout(() => { setBoomKey(Date.now()); boom(); go('boom'); }, 1600);
+        setTimeout(() => go('laugh'), 5200);
+      }, 900);
     }
+  }
+
+  function triggerFill() {
+    if (fillRef.current.phase === 'ready') startFill();
+    else stopFill();
   }
 
   // ---- generic drag (card, nozzle) ----
@@ -215,17 +206,22 @@ export default function PumpScreen({ onDone }) {
   const removeCap = () => { beep(300, 0.08); setCapStage(2); setTimeout(() => go('nozzle'), 900); };
 
   const retry = () => {
-    const l = randStart(); levelRef.current = l; setLevel(l); go('fill');
+    const n = fails + 1;
+    const z = newZone(n);
+    fillRef.current = { phase: 'ready', t0: 0, m: 0, zone: z, hit: false };
+    setFails(n); setZone(z); setMarker(0); setFillPhase('ready');
+    go('fill');
   };
 
-  const shown = Math.min(level, 100);
+  const running = fillPhase === 'running';
   const exploded = step === 'boom' || step === 'laugh';
   const car = carX;
   const inlet = INLET(car);
   const nozzlePos = drag?.id === 'nozzle' ? drag : nozzleOn ? { x: inlet.x + 6, y: inlet.y + 10 } : NOZZLE_HOME;
   const hoseEnd = nozzlePos;
   const hosePath = `M ${HOSE_PORT.x} ${HOSE_PORT.y} Q ${(HOSE_PORT.x + hoseEnd.x) / 2} ${Math.max(HOSE_PORT.y, hoseEnd.y) + 110} ${hoseEnd.x} ${hoseEnd.y}`;
-  const prompt = msg || PROMPTS[step] || (step === 'fill' ? [shown >= HIDE_NUMBER_AT ? '??%' : `${shown.toFixed(0)}%`, 'HOLD TO FILL'] : ['', '']);
+  const fillPrompt = fillPhase === 'ready' ? ['READY', 'SQUEEZE TRIGGER'] : running ? ['PUMPING…', 'STOP IN GREEN'] : fillRef.current.hit ? ['FULL ✓', 'NICE!'] : ['OVERFLOW!', '✗✗✗'];
+  const prompt = msg || PROMPTS[step] || (['fill', 'drip', 'boom'].includes(step) ? fillPrompt : ['', '']);
   const stepIdx = STEPS.findIndex(([k]) => k === (['drip', 'boom', 'laugh', 'success'].includes(step) ? 'fill' : step));
 
   const padBtn = 'w-16 h-16 rounded-xl bg-white/85 text-3xl font-bold shadow-lg active:bg-yellow-300 touch-none select-none';
@@ -267,7 +263,7 @@ export default function PumpScreen({ onDone }) {
         <Car x={car} capStage={capStage} step={step} onDoor={openDoor} onCap={removeCap} />
         {step === 'fuel' && (
           <div className="pop absolute bg-yellow-300 text-yellow-950 font-extrabold rounded-lg px-4 py-2 shadow-xl border-2 border-yellow-600" style={{ left: car + 130, top: CAR_Y - 70 }}>
-            ⛽ His Subaru: UNLEADED REGULAR 87 only
+            ⛽ His Forester: UNLEADED REGULAR 87 only
           </div>
         )}
 
@@ -304,7 +300,7 @@ export default function PumpScreen({ onDone }) {
             </div>
             <svg className="absolute pointer-events-none" style={{ left: 0, top: 0 }} width={W} height={H}>
               <path d={hosePath} stroke="#111" strokeWidth="9" fill="none" strokeLinecap="round" />
-              {holding && <path d={hosePath} stroke="#facc15" strokeWidth="3" fill="none" strokeDasharray="2 10"><animate attributeName="stroke-dashoffset" from="0" to="-24" dur=".4s" repeatCount="indefinite" /></path>}
+              {running && <path d={hosePath} stroke="#facc15" strokeWidth="3" fill="none" strokeDasharray="2 10"><animate attributeName="stroke-dashoffset" from="0" to="-24" dur=".4s" repeatCount="indefinite" /></path>}
             </svg>
             {/* nozzle */}
             {(step === 'nozzle' || drag?.id === 'nozzle' || nozzleOn || step === 'fill') && (
@@ -357,6 +353,8 @@ export default function PumpScreen({ onDone }) {
         </>
       )}
 
+      <div className="absolute bottom-1 left-2 text-[10px] text-white/70 z-40">Car photo: “2009 red Subaru Forester side” by BrokenSphere, CC BY 3.0, via Wikimedia Commons (recolored)</div>
+
       {/* ---------- step tracker ---------- */}
       <div className="absolute top-2 left-1/2 -translate-x-1/2 flex gap-2 z-40">
         {STEPS.map(([k, icon, label], i) => (
@@ -366,15 +364,20 @@ export default function PumpScreen({ onDone }) {
         ))}
       </div>
 
-      {/* ---------- fuel gauge (fill step) ---------- */}
+      {/* ---------- fill meter (fill step) ---------- */}
       {['fill', 'drip', 'boom'].includes(step) && (
-        <div className="absolute top-20 right-6 w-64 bg-slate-900/90 rounded-xl p-3 text-white shadow-xl z-40">
-          <div className="flex justify-between text-xs font-bold mb-1"><span>E</span><span>FUEL</span><span>F</span></div>
-          <div className="relative h-8 rounded-full bg-slate-700 overflow-hidden border-2 border-slate-400">
-            <div className="absolute inset-y-0 bg-emerald-400/40 border-l-2 border-emerald-300" style={{ left: `${ZONE_MIN}%`, right: 0 }} />
-            <div className={`h-full ${shown >= ZONE_MIN ? 'bg-emerald-400' : shown < 25 ? 'bg-red-500' : 'bg-amber-400'}`} style={{ width: `${shown}%` }} />
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 w-[min(92vw,640px)] bg-slate-900/90 rounded-2xl p-4 text-white shadow-xl z-40">
+          <div className="flex justify-between text-sm font-bold mb-2">
+            <span>⛽ FILL METER</span>
+            <span className="text-emerald-300">{fails > 0 ? '🍀 Easier this time: wider zone, slower meter' : 'Stop it in the green zone!'}</span>
           </div>
-          <div className="text-center text-xs mt-1 text-emerald-300">Release in the tiny green zone · flow surges!</div>
+          <div className="relative h-12 rounded-full bg-slate-700 overflow-hidden border-2 border-slate-400">
+            <div className="absolute inset-y-0 bg-emerald-400/60 border-x-4 border-emerald-300" style={{ left: `${(zone.c - zone.width / 2) * 100}%`, width: `${zone.width * 100}%` }} />
+            <div
+              className={`absolute inset-y-0 w-2 rounded ${fillPhase === 'stopped' ? (fillRef.current.hit ? 'bg-emerald-300' : 'bg-red-500') : 'bg-white'}`}
+              style={{ left: `calc(${marker * 100}% - 4px)`, boxShadow: '0 0 12px #fff' }}
+            />
+          </div>
         </div>
       )}
 
@@ -393,14 +396,17 @@ export default function PumpScreen({ onDone }) {
       {step === 'fuel' && <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/70 text-white rounded-full px-6 py-2 font-bold z-40">Pick the right fuel for the car</div>}
       {step === 'cap' && <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/70 text-white rounded-full px-6 py-2 font-bold z-40">{capStage === 0 ? 'Click the fuel door on your car' : 'Now twist off the gas cap'}</div>}
       {step === 'nozzle' && <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/70 text-white rounded-full px-6 py-2 font-bold z-40">Drag the nozzle into the fuel tank opening</div>}
-      {step === 'fill' && (
+      {step === 'fill' && fillPhase === 'ready' && (
+        <button onClick={startFill} className="absolute bottom-6 left-1/2 -translate-x-1/2 px-10 py-5 rounded-full text-2xl font-extrabold shadow-2xl bg-yellow-400 text-purple-950 hover:scale-105 active:scale-95 transition z-40">
+          ▶ Squeeze the trigger (Space)
+        </button>
+      )}
+      {step === 'fill' && fillPhase === 'running' && (
         <button
-          onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); pumpHold(true); }}
-          onPointerUp={() => pumpHold(false)} onPointerCancel={() => pumpHold(false)}
-          onContextMenu={(e) => e.preventDefault()}
-          className={`absolute bottom-6 left-1/2 -translate-x-1/2 px-10 py-5 rounded-full text-2xl font-extrabold shadow-2xl touch-none transition z-40 ${holding ? 'bg-emerald-400 scale-95 text-emerald-950' : 'bg-yellow-400 text-purple-950 hover:scale-105'}`}
+          onPointerDown={stopFill}
+          className="absolute bottom-6 left-1/2 -translate-x-1/2 px-14 py-6 rounded-full text-3xl font-extrabold shadow-2xl bg-red-500 text-white hover:bg-red-400 active:scale-95 transition touch-none z-40"
         >
-          {holding ? '⛽ Pumping…' : '👇 Hold to pump (or Space)'}
+          ✋ STOP! (Space)
         </button>
       )}
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { playMusic } from '../music';
 
 // NOTE: OSM has "Flagstone Way" in Newmarket (no "Flagstone Avenue"); coordinates are approximate.
 const HOME = [44.0615, -79.4862];
@@ -34,6 +35,8 @@ export default function DriveScreen({ onArrive }) {
   const [driving, setDriving] = useState(false);
   const [arrived, setArrived] = useState(false);
   const [fade, setFade] = useState(false);
+
+  useEffect(() => { playMusic('gas'); }, []);
 
   useEffect(() => {
     const map = L.map(mapEl.current, { zoomControl: false }).setView(HOME, 14);

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Confetti, playSound } from '../confetti';
+import { Confetti } from '../confetti';
 
 const CANDLES = [0, 1, 2, 3, 4];
 const BLOW_NEEDED = 0.6;  // seconds of sustained blowing to put out one candle
@@ -26,9 +26,6 @@ export default function CakeScreen({ onRestart }) {
     next[i] = false;
     litRef.current = next;
     setLit(next);
-    if (next.every((l) => !l)) {
-      playSound('/audio/birthday.mp3', 0.6);
-    }
   };
 
   const enableMic = async () => {

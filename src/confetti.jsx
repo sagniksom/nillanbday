@@ -32,3 +32,23 @@ export function beep(freq = 880, dur = 0.12, type = 'sine', vol = 0.15) {
     setTimeout(() => ctx.close(), dur * 1000 + 100);
   } catch { /* audio unavailable */ }
 }
+
+// Synthesized explosion (low-passed noise burst + sub thump), so no audio file is needed.
+export function boom() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const len = ctx.sampleRate * 1.6;
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.5);
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 600;
+    const g = ctx.createGain(); g.gain.value = 0.9;
+    src.connect(lp); lp.connect(g); g.connect(ctx.destination); src.start();
+    const o = ctx.createOscillator(), og = ctx.createGain();
+    o.frequency.setValueAtTime(110, ctx.currentTime); o.frequency.exponentialRampToValueAtTime(30, ctx.currentTime + 0.8);
+    og.gain.setValueAtTime(0.8, ctx.currentTime); og.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.9);
+    o.connect(og); og.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 1);
+    setTimeout(() => ctx.close(), 2000);
+  } catch { /* audio unavailable */ }
+}
