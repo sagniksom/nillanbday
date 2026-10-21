@@ -27,7 +27,7 @@ export default function InterludeScreen({ onNext }) {
           onClick={onNext}
           className="px-10 py-4 rounded-full bg-yellow-400 text-purple-950 text-2xl font-bold shadow-xl hover:scale-110 active:scale-95 transition"
         >
-          Uh oh… what? 😬
+          Let's goooo! 🚀
         </button>
       </div>
     </div>
